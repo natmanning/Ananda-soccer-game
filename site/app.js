@@ -626,7 +626,8 @@
         ${badge(c)}
         <span><span class="eyebrow">My Team</span><h3>${esc(c.name)}</h3>
           <span class="small">${row ? `${ord(row.pos)} in the ${esc(c.league)} · ${row.pts} pts` : esc(c.nickname)}</span></span>
-        <span class="go">Open</span></button>`;
+        <span class="go">Open</span></button>
+      <button class="btn ghost wide" data-go="ask" type="button">Ask the Coach about ${esc(c.name)}</button>`;
   }
 
   function renderPicker() {
@@ -670,6 +671,7 @@
         </div>
         <div class="row">
           <button class="btn" data-go="teamquiz" type="button">${esc(c.short)} Quiz</button>
+          <button class="btn" data-go="ask" type="button">Ask the Coach</button>
           <button class="btn ghost" data-go="teampick" type="button">Change team</button>
         </div>
       </div>
@@ -772,6 +774,167 @@
     picked.push(...pickLeastSeen(club, 8 - picked.length));
     if (picked.length < 8) picked.push(...pickLeastSeen(QUESTIONS.filter((x) => x.d <= 2), 8 - picked.length));
     startQuiz({ kind: 'team', opp: `${c.short} Legends XI`, title: `${c.name} Quiz`, questions: shuffle(picked.slice(0, 8)) });
+  }
+
+
+  // ───────────── Ask the Coach ─────────────
+  // Answers typed questions about clubs from teams.js and the live data.
+  const plain = (x) => String(x ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9#]+/g, ' ').trim();
+  const has = (q, re) => re.test(q);
+  const ALIASES = {
+    ars: ['arsenal', 'gunners'], che: ['chelsea'], liv: ['liverpool'], mci: ['man city', 'manchester city'],
+    mun: ['man united', 'man utd', 'manchester united'], tot: ['tottenham', 'spurs'], new: ['newcastle', 'magpies'],
+    rma: ['real madrid'], bar: ['barcelona', 'barca'], atm: ['atletico', 'atleti'], bay: ['bayern'],
+    bvb: ['dortmund', 'bvb'], lev: ['leverkusen'], juv: ['juventus', 'juve'], int: ['inter milan', 'inter', 'internazionale'],
+    acm: ['ac milan', 'milan'], nap: ['napoli'], psg: ['psg', 'paris saint germain', 'paris'],
+  };
+  const wordIn = (q, w) => new RegExp(`(^| )${w}( |$)`).test(q);
+
+  function clubIn(q) {
+    const pairs = Object.entries(ALIASES).flatMap(([id, list]) => list.map((a) => [id, a])).sort((a, b) => b[1].length - a[1].length);
+    for (const [id, a] of pairs) if (wordIn(q, a)) return CLUBS.find((c) => c.id === id);
+    return null;
+  }
+  // Any team in the live tables, e.g. "Where are Brighton?"
+  function tableTeamIn(q) {
+    for (const lg of LIVE?.leagues || []) {
+      if (lg.id === 'uefa.champions') continue;
+      for (const r of lg.table) if (wordIn(q, plain(r.team))) return { lg, r };
+    }
+    return null;
+  }
+  function playerIn(q, clubsFirst) {
+    const ids = [...clubsFirst.map((c) => c.id), ...Object.keys(LIVE?.clubs || {})];
+    for (const id of [...new Set(ids)]) {
+      for (const p of LIVE?.clubs?.[id]?.roster || []) {
+        const full = plain(p.name);
+        const last = full.split(' ').pop();
+        if (wordIn(q, full) || (last.length >= 4 && wordIn(q, last))) return { p, club: CLUBS.find((c) => c.id === id) };
+      }
+    }
+    return null;
+  }
+  const describe = (p, c) => `${p.name} ${p.number ? `wears number ${p.number}` : 'is in the squad'} for ${c.name}${p.pos ? ` and plays as a ${POSONE[p.pos].toLowerCase()}` : ''}${p.nation ? `. He's from ${p.nation}` : ''}${p.age ? ` and he's ${p.age}` : ''}.`;
+  const noLive = 'I don\'t have this season\'s live stats loaded yet. They arrive with the daily update, so ask me again later!';
+
+  function answerFor(raw) {
+    const q = plain(raw);
+    const mine = myClub();
+    const other = clubIn(q);
+    const c = other || mine;
+    const L = clubLive(c);
+    const row = L?.row;
+    const sq = L?.roster || [];
+
+    if (!q) return 'Ask me anything about your team!';
+    if (has(q, /^(hi|hello|hey|hiya|yo)\b/)) return `Hi ${S.name}! I'm your coach. Ask me about ${mine.name}: the table, players, shirt numbers, how we play, or our history.`;
+
+    // Shirt numbers: "who wears number 10", "who is #9"
+    const num = q.match(/(?:number|no|num|#|wears|shirt)\s*(\d{1,2})\b/) || (has(q, /\bwho\b/) && q.match(/\b(\d{1,2})\b/));
+    if (num) {
+      if (!sq.length) return noLive;
+      const n = Number(num[1]);
+      const p = sq.find((x) => x.number === n);
+      return p ? describe(p, c) : `Nobody in the ${c.name} squad wears number ${n} right now.`;
+    }
+
+    // A player's name
+    const hit = playerIn(q, [c]);
+    if (hit) {
+      const { p, club } = hit;
+      const sc = clubLive(club)?.scorers?.find((x) => x.name === p.name);
+      return describe(p, club) + (sc ? ` He has ${sc.value} league goals this season, one of the top scorers!` : '');
+    }
+
+    // Someone else in a league table
+    const tt = !other && tableTeamIn(q);
+    if (tt && has(q, /table|position|place|where|top|bottom|points|rank|doing/)) {
+      return `${tt.r.team} are ${ord(tt.r.pos)} in the ${tt.lg.name} with ${tt.r.pts} points from ${tt.r.played} games.`;
+    }
+
+    // Who is top of the league?
+    if (has(q, /who.*(top|winning|first|leading)|league leader|top of the (league|table)/) && !has(q, /scor/)) {
+      const lg = LIVE?.leagues?.find((l) => l.name === c.league);
+      if (!lg?.table?.length) return noLive;
+      const top = lg.table[0];
+      return `${top.team} are top of the ${lg.name} with ${top.pts} points.${row && top.team !== row.team ? ` ${c.name} are ${ord(row.pos)}, ${top.pts - row.pts} points behind.` : row ? ` That's ${c.name}!` : ''}`;
+    }
+
+    const group = has(q, /\b(best|top|most)\b/) ? null : has(q, /keeper|goalie/) ? 'GK' : has(q, /defender|defence|back/) ? 'DEF' : has(q, /midfield/) ? 'MID' : has(q, /forward|striker|attacker|winger/) ? 'FWD' : null;
+    if (group) {
+      if (!sq.length) return noLive;
+      const list = sq.filter((p) => p.pos === group);
+      return list.length ? `${c.name}'s ${POSNAME[group].toLowerCase()}: ${list.map((p) => `${p.name}${p.number ? ` (#${p.number})` : ''}`).join(', ')}.` : `I couldn't find the ${POSNAME[group].toLowerCase()} in the squad list.`;
+    }
+    if (has(q, /scorer|who.*(scor|most goals)|best (striker|forward|attacker)|goal ?getter/) && !has(q, /let in|concede/)) {
+      if (!L) return noLive;
+      if (L.scorers?.length) return `${c.name}'s top scorer in the ${c.league} is ${L.scorers[0].name} with ${L.scorers[0].value} goals.${L.scorers.length > 1 ? ` ${L.scorers.slice(1).map((x) => `${x.name} has ${x.value}`).join(', ')}.` : ''}`;
+      return `None of ${c.name}'s players are in the ${c.league}'s top 10 scorers yet. The team has scored ${row?.gf ?? 'some'} league goals so far.`;
+    }
+    if (has(q, /let in|concede|defen[cs]e|clean sheet/)) {
+      if (!row) return noLive;
+      return `${c.name} have let in ${row.ga} goals in ${row.played} league games.${row.ga <= row.played ? ' That\'s strong defending!' : ' Defenders, keep working!'}`;
+    }
+    if (has(q, /table|position|place|rank|standing|where are|how are .* doing|top|bottom|league/) && !has(q, /stadium|play at|from|city|style/)) {
+      if (!row) return noLive;
+      return `${c.name} are ${ord(row.pos)} in the ${c.league} with ${row.pts} points from ${row.played} games.`;
+    }
+    if (has(q, /point/)) return row ? `${c.name} have ${row.pts} points from ${row.played} games.` : noLive;
+    if (has(q, /trophy|trophies|title|cup|history|famous|record|ever won|what have/)) {
+      return `Here's what ${c.name} are famous for: ${c.records.join('. ')}.`;
+    }
+    if (has(q, /\b(won|win|wins|lost|lose|losses|draw|drew|draws|games)\b/)) {
+      if (!row) return noLive;
+      return `This season ${c.name} have played ${row.played}: won ${row.won}, drawn ${row.drawn} and lost ${row.lost}. They've scored ${row.gf} and let in ${row.ga}.`;
+    }
+    if (has(q, /\bgoals?\b/)) return row ? `${c.name} have scored ${row.gf} league goals and let in ${row.ga}.` : noLive;
+    if (has(q, /style|how do|how does|tactic|formation|play like|press|passing|attack/)) {
+      return `${c.style} Their game in three words: ${c.tags.join(', ')}. Coach's tip: ${c.tip}`;
+    }
+    if (has(q, /squad|players|team sheet|who plays|line ?up/)) {
+      if (!sq.length) return noLive;
+      return `${c.name} have ${sq.length} players in the squad. Some of them: ${shuffle(sq).slice(0, 6).map((p) => p.name).join(', ')}. Ask me about any player, or "who are the forwards?"`;
+    }
+    if (has(q, /stadium|ground|home|fans|capacity|play at/)) return `${c.name} play at ${c.stadium}. About ${c.capacity} fans fit inside!`;
+    if (has(q, /found|old|start|begin|year|born|when/)) return `${c.name} were founded in ${c.founded}. That's ${new Date().getFullYear() - c.founded} years ago!`;
+    if (has(q, /nickname|called|name/)) return `${c.name}'s nickname is ${c.nickname}.`;
+    if (has(q, /legend|greatest|best (player )?ever|hero|icon/)) return `${c.name} legends include ${c.legends.map(legendName).join(', ')}.`;
+    if (has(q, /city|from|where/)) return `${c.name} are from ${c.city}. Their home ground is ${c.stadium}.`;
+    if (has(q, /tip|practi[cs]e|train|better|improve/)) return `Coach's tip: ${c.tip}`;
+    return `Good question! I'm not sure about that one. I know about the table, points, goals, top scorers, shirt numbers, players, how ${c.name} play, the stadium, legends and records. Try one of the buttons below.`;
+  }
+
+  let chat = [];
+  const SUGGEST = ['Where are we in the table?', 'Who is our top scorer?', 'Who wears number 10?', 'How do we play?', 'Who are our forwards?', 'What have we won?', 'Who are our legends?', 'Who is top of the league?'];
+
+  function renderAsk() {
+    const c = myClub();
+    if (!chat.length || chat.club !== c.id) {
+      chat = [{ who: 'coach', text: `Hi ${S.name}! Ask me anything about ${c.name}: the table, players, shirt numbers, how we play, or our history. You can ask about other teams too!` }];
+      chat.club = c.id;
+    }
+    $('#ask').innerHTML = `
+      <div class="panel ask-head" style="${clubVars(c)}">${badge(c)}<div><span class="eyebrow">Ask the Coach</span><h2>${esc(c.name)}</h2></div></div>
+      <div class="chat" id="chat" aria-live="polite">${chat.map((m) => `<div class="bubble by-${m.who}">${m.who === 'coach' ? `<span class="whistle">${whistleSVG}</span>` : ''}<p>${esc(m.text)}</p></div>`).join('')}</div>
+      <div class="chiprow ask-chips">${SUGGEST.map((x) => `<button type="button" class="ask-chip" data-ask="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+      <form class="ask-form" id="askform" autocomplete="off">
+        <label class="sr-only" for="askq">Your question</label>
+        <input id="askq" type="text" maxlength="120" placeholder="Type a question…" enterkeyhint="send">
+        <button class="btn" type="submit">Ask</button>
+      </form>`;
+    $('#askform').addEventListener('submit', (e) => { e.preventDefault(); const v = $('#askq').value; $('#askq').value = ''; askCoach(v); });
+    const box = $('#chat');
+    box.lastElementChild?.scrollIntoView({ block: 'nearest' });
+  }
+
+  function askCoach(text) {
+    const t = String(text).trim().slice(0, 120);
+    if (!t) return;
+    chat.push({ who: 'me', text: t });
+    chat.push({ who: 'coach', text: answerFor(t) });
+    sfx('coin');
+    renderAsk();
+    $('#askq').focus({ preventScroll: true });
   }
 
   // ───────────── Training ground ─────────────
@@ -893,7 +1056,7 @@
     if (t.id === 'back') {
       if (screen === 'match' && M) { if (!M.results.length || confirmLeave()) goHome(); return; }
       if (screen === 'result' && M?.kind === 'level') { renderLevel(M.level); show('level'); return; }
-      if ((screen === 'result' && M?.kind === 'team') || (screen === 'teampick' && S.team)) { renderTeam(); show('team'); return; }
+      if ((screen === 'result' && M?.kind === 'team') || (screen === 'teampick' && S.team) || screen === 'ask') { renderTeam(); show('team'); return; }
       goHome(); return;
     }
     if (t.id === 'sound') { S.sound = !S.sound; save(); renderBar(); if (S.sound) sfx('coin'); return; }
@@ -918,6 +1081,7 @@
     if (t.dataset.drill) return doDrill(t.dataset.drill);
     if (t.dataset.sticker) return showSticker(Number(t.dataset.sticker));
     if (t.dataset.club) return pickClub(t.dataset.club);
+    if (t.dataset.ask) return askCoach(t.dataset.ask);
     if (t.dataset.play) { const [i, m] = t.dataset.play.split('-').map(Number); return startLevelMatch(i, m); }
 
     const go = t.dataset.go;
@@ -937,6 +1101,7 @@
     if (go === 'team') { if (!myClub()) { renderPicker(); return show('teampick'); } renderTeam(); return show('team'); }
     if (go === 'teampick') { renderPicker(); return show('teampick'); }
     if (go === 'teamquiz') return startTeamQuiz();
+    if (go === 'ask') { if (!myClub()) { renderPicker(); return show('teampick'); } renderAsk(); return show('ask'); }
     if (go === 'livequiz') return LIVEQ.length >= 8 ? startLiveQuiz() : undefined;
     if (go === 'training') { renderTraining(); return show('training'); }
     if (go === 'album') { renderAlbum(); return show('album'); }

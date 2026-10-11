@@ -7,6 +7,7 @@ A football quiz career game for Ananda. Climb from **Youth Academy** to the **Ba
 - **Career ladder:** 6 levels with 3 matches each. Each question is a chance on goal: get it right and you score, get it wrong and the other team scores. Win 5–3 or better for 1 star, 6 or 7 goals for 2, and 8–0 for 3. Getting 5 stars in a level unlocks the next one.
 - **This Season (live):** league tables, top scorers and headlines for the Premier League, La Liga, Bundesliga, Serie A, Ligue 1 and the Champions League. These turn into quiz questions like "Who is top of La Liga right now?"
 - **My Team:** pick a favourite club from 18 of Europe's biggest. Its page shows this season's table position and stats, the current squad with shirt numbers, how the team plays, records and legends. There's also a team quiz that mixes club history with live questions, like "Who wears number 10?"
+- **Ask the Coach:** type a question about your team (or any team) and the coach answers from the club facts and live data: "Where are we in the table?", "Who wears number 10?", "Who are our forwards?", "How do we play?", "What have we won?"
 - **Daily Challenge:** 5 questions a day, double coins.
 - **Penalty Shootout:** "Real or Fake?" statements. Each right answer is a goal.
 - **Training Ground:** 3 real drills a day to do outside (toe taps, weak-foot passes, Cruyff turns…). Each is worth 15 coins.
