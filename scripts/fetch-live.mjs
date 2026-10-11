@@ -206,7 +206,8 @@ async function main() {
       const rosterJson = team ? await settle(`${club.id} roster`, getJSON(`${API}/site/v2/sports/soccer/${id}/teams/${team.id}/roster`)) : null;
       const roster = rosterJson ? parseRoster(rosterJson) : [];
       if (row || roster.length) clubs[club.id] = { name: teamName, row, scorers, roster };
-      console.log(`${team ? '✓' : '!'} ${club.id}: ${team ? team.name : 'no ESPN team match'}, table ${row ? `#${row.pos}` : 'not found'}, ${roster.length} players`);
+      const byPos = roster.reduce((m, p) => ({ ...m, [p.pos ?? '?']: (m[p.pos ?? '?'] ?? 0) + 1 }), {});
+      console.log(`${team ? '✓' : '!'} ${club.id}: ${team ? team.name : 'no ESPN team match'}, table ${row ? `#${row.pos}` : 'not found'}, ${roster.length} players ${JSON.stringify(byPos)}, ${roster.filter((p) => p.number).length} with numbers, ${scorers.length} top scorers`);
     }
   }
 
