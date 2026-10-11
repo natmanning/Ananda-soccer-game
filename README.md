@@ -6,6 +6,7 @@ A football quiz career game for Ananda. Climb from **Youth Academy** to the **Ba
 
 - **Career ladder:** 6 levels with 3 matches each. Each question is a chance on goal: get it right and you score, get it wrong and the other team scores. Win 5–3 or better for 1 star, 6 or 7 goals for 2, and 8–0 for 3. Getting 5 stars in a level unlocks the next one.
 - **This Season (live):** league tables, top scorers and headlines for the Premier League, La Liga, Bundesliga, Serie A, Ligue 1 and the Champions League. These turn into quiz questions like "Who is top of La Liga right now?"
+- **My Team:** pick a favourite club from 18 of Europe's biggest. Its page shows this season's table position and stats, the current squad with shirt numbers, how the team plays, records and legends. There's also a team quiz that mixes club history with live questions, like "Who wears number 10?"
 - **Daily Challenge:** 5 questions a day, double coins.
 - **Penalty Shootout:** "Real or Fake?" statements. Each right answer is a goal.
 - **Training Ground:** 3 real drills a day to do outside (toe taps, weak-foot passes, Cruyff turns…). Each is worth 15 coins.
@@ -31,13 +32,13 @@ It opens full-screen like an app, with its own icon.
 
 ## How the live stats work
 
-`.github/workflows/deploy.yml` runs twice a day. It calls `scripts/fetch-live.mjs`, which downloads tables, top scorers and headlines from ESPN's public JSON feeds, writes `site/data/live.json`, and redeploys the site. If ESPN is down, the game still works with its built-in questions.
+`.github/workflows/deploy.yml` runs twice a day. It calls `scripts/fetch-live.mjs`, which downloads tables, top scorers and headlines from ESPN's public JSON feeds, also fetches current squads for the My Team clubs, writes `site/data/live.json`, and redeploys the site. If ESPN is down, the game still works with its built-in questions.
 
 GitHub pauses scheduled workflows after 60 days without any commits. If the "updated" date in the game stops changing, open **Actions** and click **Enable workflow**, or push any small change.
 
 ## Adding questions
 
-Edit `site/questions.js`. Each line looks like:
+Edit `site/questions.js` (club facts for My Team live in `site/teams.js`). Each line looks like:
 
 ```js
 q(2, 'clubs', 'Which club plays at Anfield?', 'Liverpool', ['Everton', 'Arsenal', 'Chelsea'], 'Fun fact shown after answering.', 'Optional coach tip.'),

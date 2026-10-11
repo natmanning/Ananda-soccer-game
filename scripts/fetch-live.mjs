@@ -20,6 +20,29 @@ export const LEAGUES = [
   { id: 'uefa.champions', name: 'Champions League', country: 'Europe' },
 ];
 
+// Clubs in the game's "My Team" mode (ids match site/teams.js). We fetch their
+// current squads. `names` are spellings ESPN might use for the club.
+export const CLUBS = [
+  { id: 'ars', league: 'eng.1', names: ['Arsenal'] },
+  { id: 'che', league: 'eng.1', names: ['Chelsea'] },
+  { id: 'liv', league: 'eng.1', names: ['Liverpool'] },
+  { id: 'mci', league: 'eng.1', names: ['Manchester City', 'Man City'] },
+  { id: 'mun', league: 'eng.1', names: ['Manchester United', 'Man United', 'Man Utd'] },
+  { id: 'tot', league: 'eng.1', names: ['Tottenham Hotspur', 'Tottenham', 'Spurs'] },
+  { id: 'new', league: 'eng.1', names: ['Newcastle United', 'Newcastle'] },
+  { id: 'rma', league: 'esp.1', names: ['Real Madrid'] },
+  { id: 'bar', league: 'esp.1', names: ['Barcelona', 'FC Barcelona'] },
+  { id: 'atm', league: 'esp.1', names: ['Atlético Madrid', 'Atletico Madrid', 'Atlético de Madrid'] },
+  { id: 'bay', league: 'ger.1', names: ['Bayern Munich', 'Bayern München', 'FC Bayern'] },
+  { id: 'bvb', league: 'ger.1', names: ['Borussia Dortmund', 'Dortmund'] },
+  { id: 'lev', league: 'ger.1', names: ['Bayer Leverkusen', 'Leverkusen', 'Bayer 04 Leverkusen'] },
+  { id: 'juv', league: 'ita.1', names: ['Juventus'] },
+  { id: 'int', league: 'ita.1', names: ['Internazionale', 'Inter Milan', 'Inter'] },
+  { id: 'acm', league: 'ita.1', names: ['AC Milan', 'Milan'] },
+  { id: 'nap', league: 'ita.1', names: ['Napoli', 'SSC Napoli'] },
+  { id: 'psg', league: 'fra.1', names: ['Paris Saint-Germain', 'Paris Saint Germain', 'PSG'] },
+];
+
 const API = 'https://site.api.espn.com/apis';
 const OUT = resolve(dirname(fileURLToPath(import.meta.url)), '../site/data/live.json');
 
@@ -104,6 +127,38 @@ export function parseNews(json, league) {
     }));
 }
 
+const norm = (s) => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+// True when an ESPN team name is one of the club's known spellings.
+export const sameClub = (club, name) => club.names.some((n) => norm(n) === norm(name));
+
+export function parseTeams(json) {
+  const leagues = json?.sports?.[0]?.leagues ?? [];
+  return leagues.flatMap((l) => l.teams ?? []).map((t) => t.team ?? t).filter((t) => t?.id && t.displayName)
+    .map((t) => ({ id: String(t.id), name: t.displayName, alt: [t.shortDisplayName, t.name, t.nickname].filter(Boolean) }));
+}
+
+const POS = { G: 'GK', D: 'DEF', M: 'MID', F: 'FWD', A: 'FWD', S: 'FWD' };
+
+export function parseRoster(json) {
+  // Soccer rosters are usually a flat list; some sports group them as [{ items: [...] }].
+  const raw = (json?.athletes ?? []).flatMap((a) => (Array.isArray(a.items) ? a.items : [a]));
+  return raw
+    .map((a) => {
+      const p = a.position ?? {};
+      const letter = String(p.abbreviation ?? p.displayName ?? p.name ?? '').trim().charAt(0).toUpperCase();
+      const num = Number.parseInt(a.jersey, 10);
+      return {
+        name: a.displayName ?? a.fullName,
+        number: Number.isFinite(num) ? num : null,
+        pos: POS[letter] ?? null,
+        age: Number.isFinite(a.age) ? a.age : null,
+        nation: a.citizenship ?? a.flag?.alt ?? null,
+      };
+    })
+    .filter((p) => p.name);
+}
+
 async function settle(label, promise) {
   try {
     return await promise;
@@ -137,8 +192,26 @@ async function main() {
     return;
   }
 
+  // Squads, table rows and top scorers for the "My Team" clubs.
+  const clubs = {};
+  for (const id of [...new Set(CLUBS.map((c) => c.league))]) {
+    const teamsJson = await settle(`${id} teams`, getJSON(`${API}/site/v2/sports/soccer/${id}/teams`));
+    const teams = teamsJson ? parseTeams(teamsJson) : [];
+    const league = leagues.find((l) => l.id === id);
+    for (const club of CLUBS.filter((c) => c.league === id)) {
+      const team = teams.find((t) => [t.name, ...t.alt].some((n) => sameClub(club, n)));
+      const row = league?.table.find((r) => sameClub(club, r.team) || (team && r.team === team.name)) ?? null;
+      const teamName = team?.name ?? row?.team;
+      const scorers = (league?.scorers ?? []).filter((p) => p.team && (p.team === teamName || sameClub(club, p.team)));
+      const rosterJson = team ? await settle(`${club.id} roster`, getJSON(`${API}/site/v2/sports/soccer/${id}/teams/${team.id}/roster`)) : null;
+      const roster = rosterJson ? parseRoster(rosterJson) : [];
+      if (row || roster.length) clubs[club.id] = { name: teamName, row, scorers, roster };
+      console.log(`${team ? '✓' : '!'} ${club.id}: ${team ? team.name : 'no ESPN team match'}, table ${row ? `#${row.pos}` : 'not found'}, ${roster.length} players`);
+    }
+  }
+
   news.sort((a, b) => String(b.published).localeCompare(String(a.published)));
-  const data = { updated: new Date().toISOString(), season, leagues, news: news.slice(0, 12) };
+  const data = { updated: new Date().toISOString(), season, leagues, clubs, news: news.slice(0, 12) };
   await mkdir(dirname(OUT), { recursive: true });
   await writeFile(OUT, JSON.stringify(data, null, 1));
   console.log(`Wrote ${OUT}`);

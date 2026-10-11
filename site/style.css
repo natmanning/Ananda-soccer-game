@@ -241,3 +241,39 @@ input[type=text] { font: inherit; padding: 12px 14px; border-radius: 12px; borde
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ── My Team ── */
+.crest-badge { display: inline-grid; place-items: center; flex: none; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, var(--c1) 0 55%, var(--c2) 55% 100%); color: var(--ink); font-family: var(--display); font-size: 0.95rem; border: 3px solid rgba(255,255,255,0.85); box-shadow: 0 2px 8px rgba(0,0,0,0.35); text-shadow: 0 0 3px var(--halo); }
+.crest-badge.big { width: 76px; height: 76px; font-size: 1.3rem; }
+.myteam { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 14px; border-radius: 16px; border: 2px solid var(--c1); background: linear-gradient(110deg, color-mix(in srgb, var(--c1) 35%, var(--panel-solid)) 0%, var(--panel-solid) 70%); }
+.myteam.empty { border: 2px dashed var(--kit); background: var(--panel); }
+.myteam h3 { font-size: 1.25rem; }
+.myteam .go { font-family: var(--display); color: var(--kit); }
+.team-hero { display: grid; gap: 12px; padding: 18px; border-radius: var(--r); border: 1px solid var(--line); background: linear-gradient(160deg, color-mix(in srgb, var(--c1) 55%, var(--panel-solid)) 0%, var(--panel-solid) 75%); }
+.team-hero .top { display: flex; gap: 14px; align-items: center; min-width: 0; }
+.team-hero h1 { font-size: 1.8rem; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.facts div { padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,0.25); min-width: 0; }
+.facts span { display: block; font-size: 0.72rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.facts b { overflow-wrap: anywhere; }
+.statgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; text-align: center; font-variant-numeric: tabular-nums; }
+.statgrid div { padding: 8px 4px; border-radius: 10px; background: rgba(255,255,255,0.06); }
+.statgrid b { display: block; font-family: var(--display); font-size: 1.5rem; color: var(--kit); font-weight: 400; }
+.statgrid span { font-size: 0.72rem; font-weight: 900; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; }
+.bigpos { display: flex; align-items: baseline; gap: 10px; }
+.bigpos b { font-family: var(--display); font-size: 3rem; line-height: 1; color: var(--kit); font-weight: 400; }
+.chiprow { display: flex; flex-wrap: wrap; gap: 6px; }
+.chiprow span { padding: 4px 10px; border-radius: 99px; background: rgba(255,255,255,0.1); font-weight: 800; font-size: 0.9rem; }
+.chiprow.style span { background: var(--kit); color: var(--kit-ink); }
+.squad { display: grid; gap: 12px; }
+.squad h3 { font-size: 0.95rem; color: var(--muted); font-family: var(--body); font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
+.squad ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.squad li { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,0.05); min-width: 0; }
+.squad li i { font-style: normal; flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--c1); color: var(--ink); font-family: var(--display); font-size: 0.95rem; text-shadow: 0 0 3px var(--halo); }
+.squad li span { min-width: 0; overflow-wrap: anywhere; line-height: 1.2; font-size: 0.95rem; }
+.factlist { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.picker { display: grid; gap: 14px; }
+.picker .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.pick { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 14px; border: 2px solid var(--line); background: var(--panel); text-align: left; font-weight: 900; line-height: 1.15; min-width: 0; }
+.pick .crest-badge { width: 40px; height: 40px; font-size: 0.75rem; border-width: 2px; }
+.pick.on { border-color: var(--kit); }

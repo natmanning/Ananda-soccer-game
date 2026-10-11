@@ -69,3 +69,30 @@ test('parseNews keeps headline, league and link', () => {
   assert.equal(items[0].league, 'La Liga');
   assert.equal(items[0].url, 'https://x');
 });
+
+test('parseTeams and sameClub match ESPN team names to game clubs', async () => {
+  const { parseTeams, sameClub, CLUBS } = await import('./fetch-live.mjs');
+  const teams = parseTeams({ sports: [{ leagues: [{ teams: [
+    { team: { id: 86, displayName: 'Atlético Madrid', shortDisplayName: 'Atlético' } },
+    { team: { id: 110, displayName: 'Internazionale', shortDisplayName: 'Inter' } },
+  ] }] }] });
+  assert.equal(teams.length, 2);
+  const atm = CLUBS.find((c) => c.id === 'atm');
+  const int = CLUBS.find((c) => c.id === 'int');
+  assert.ok(sameClub(atm, 'Atletico Madrid'));
+  assert.ok(sameClub(int, teams[1].name));
+  assert.ok(!sameClub(int, 'AC Milan'));
+});
+
+test('parseRoster reads names, shirt numbers and positions', async () => {
+  const { parseRoster } = await import('./fetch-live.mjs');
+  const flat = parseRoster({ athletes: [
+    { displayName: 'Keeper One', jersey: '1', position: { abbreviation: 'G' }, age: 30 },
+    { displayName: 'Mid Two', jersey: '8', position: { displayName: 'Midfielder' }, citizenship: 'Spain' },
+    { displayName: 'No Number', position: { abbreviation: 'F' } },
+  ] });
+  assert.deepEqual(flat.map((p) => [p.number, p.pos]), [[1, 'GK'], [8, 'MID'], [null, 'FWD']]);
+  assert.equal(flat[1].nation, 'Spain');
+  const grouped = parseRoster({ athletes: [{ items: [{ displayName: 'A', jersey: '9', position: { abbreviation: 'F' } }] }] });
+  assert.equal(grouped[0].number, 9);
+});

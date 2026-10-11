@@ -15,6 +15,7 @@ window.TOPICS = {
   tactics: 'Tactics',
   skills: 'Skills',
   stars: 'Stars',
+  team: 'My Team',
 };
 
 window.QUESTIONS = [

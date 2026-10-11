@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const { QUESTIONS, TRUE_FALSE, STICKERS, DRILLS, TOPICS } = window;
+  const { QUESTIONS, TRUE_FALSE, STICKERS, DRILLS, TOPICS, CLUBS } = window;
 
   // ───────────── Helpers ─────────────
   const $ = (sel, el = document) => el.querySelector(sel);
@@ -44,8 +44,8 @@
   const KEY = 'ananda-fc-v1';
   const freshState = () => ({
     name: 'Ananda', coins: 0, earned: 0, best: {}, seen: {}, stickers: {}, trophies: {},
-    stats: { correct: 0, answered: 0, bestStreak: 0, live: 0, drills: 0, matches: 0, perfect: 0, pens5: 0 },
-    days: { last: null, streak: 0 }, daily: null, drills: { date: null, done: [] }, sound: true,
+    stats: { correct: 0, answered: 0, bestStreak: 0, live: 0, drills: 0, matches: 0, perfect: 0, pens5: 0, teamPerfect: 0 },
+    days: { last: null, streak: 0 }, daily: null, drills: { date: null, done: [] }, sound: true, team: null,
   });
   const load = () => {
     const base = freshState();
@@ -93,6 +93,8 @@
     { id: 'live', name: 'Live Wire', how: 'Get 10 live-stats questions right', test: () => S.stats.live >= 10 },
     { id: 'streak3', name: 'On Fire', how: 'Play 3 days in a row', test: () => S.days.streak >= 3 },
     { id: 'streak7', name: 'Week of Football', how: 'Play 7 days in a row', test: () => S.days.streak >= 7 },
+    { id: 'fan', name: 'True Fan', how: 'Pick your favourite team', test: () => !!S.team },
+    { id: 'superfan', name: 'Super Fan', how: 'Win your team quiz 8–0', test: () => S.stats.teamPerfect >= 1 },
     { id: 'drills10', name: 'Training Pro', how: 'Finish 10 training drills', test: () => S.stats.drills >= 10 },
     { id: 'stick10', name: 'Collector', how: 'Collect 10 different stickers', test: () => owned() >= 10 },
     { id: 'stick25', name: 'Super Collector', how: 'Collect 25 different stickers', test: () => owned() >= 25 },
@@ -279,6 +281,8 @@
         <button class="btn wide" data-go="level" data-level="${cur}" type="button">Play next match</button>
       </div>
 
+      ${myTeamBanner()}
+
       <div class="tiles">
         <button class="tile ${dailyDone ? '' : 'hot'}" data-go="daily" type="button">${tileArt.daily}
           ${dailyDone ? '<span class="badge done">DONE</span>' : '<span class="badge">NEW</span>'}
@@ -446,7 +450,7 @@
       if (starsWon > (S.best[key] || 0)) { S.best[key] = starsWon; improved = true; }
     }
     if (win) earned += 20;
-    if (M.you === n) { S.stats.perfect++; earned += 30; }
+    if (M.you === n) { S.stats.perfect++; earned += 30; if (M.kind === 'team') S.stats.teamPerfect++; }
     if (M.kind === 'daily') S.daily = dayKey();
     addCoins(earned);
     S.stats.matches++;
@@ -472,6 +476,7 @@
         ${nextMatch !== null ? `<button class="btn" data-play="${M.level}-${nextMatch}" type="button">Next match</button>` : ''}
         ${M.kind === 'level' ? `<button class="btn ${nextMatch !== null ? 'ghost' : ''}" data-play="${M.level}-${M.match}" type="button">Play again</button>` : ''}
         ${M.kind === 'live' ? '<button class="btn" data-go="livequiz" type="button">Play again</button>' : ''}
+        ${M.kind === 'team' ? '<button class="btn" data-go="teamquiz" type="button">Play again</button><button class="btn ghost" data-go="team" type="button">Team page</button>' : ''}
         <button class="btn ghost" data-go="home" type="button">Home</button>
       </div>`;
     show('result');
@@ -588,6 +593,185 @@
       ${LIVE.news?.length ? `<div class="panel"><h2 style="margin-bottom:10px">Headlines</h2><div class="news">
         ${LIVE.news.map((a) => `<a href="${esc(a.url || '#')}" target="_blank" rel="noopener"><span>${esc(a.league)}</span>${esc(a.headline)}</a>`).join('')}
       </div></div>` : ''}`;
+  }
+
+
+  // ───────────── My Team ─────────────
+  const myClub = () => CLUBS.find((c) => c.id === S.team) || null;
+  const clubLive = (c) => LIVE?.clubs?.[c.id] || null;
+  const legendName = (l) => l.split('|')[0];
+  const legendAlso = (l) => (l.split('|')[1] || '').split(',').filter(Boolean);
+  const POSNAME = { GK: 'Goalkeepers', DEF: 'Defenders', MID: 'Midfielders', FWD: 'Forwards' };
+  const POSONE = { GK: 'Goalkeeper', DEF: 'Defender', MID: 'Midfielder', FWD: 'Forward' };
+
+  // Pick dark or light lettering for a club colour.
+  const inkFor = (hex) => {
+    const n = parseInt(hex.slice(1), 16);
+    const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+    return lum > 0.6 ? '--ink:#111;--halo:rgba(255,255,255,0.6)' : '--ink:#fff;--halo:rgba(0,0,0,0.6)';
+  };
+  const clubVars = (c) => `--c1:${c.colors[0]};--c2:${c.colors[1]};${inkFor(c.colors[0])}`;
+  const badge = (c, cls = '') => `<span class="crest-badge ${cls}" style="${clubVars(c)}" aria-hidden="true">${esc(c.short)}</span>`;
+
+  function myTeamBanner() {
+    const c = myClub();
+    if (!c) {
+      return `<button class="myteam empty" data-go="teampick" type="button">
+        <span class="crest-badge" style="--c1:#1d3a2c;--c2:#12402a;--ink:#ffd23f;--halo:transparent">?</span>
+        <span><span class="eyebrow">My Team</span><h3>Pick your favourite team</h3><span class="small muted">Squad, stats, style of play and a team quiz</span></span>
+        <span class="go">Go</span></button>`;
+    }
+    const row = clubLive(c)?.row;
+    return `<button class="myteam" data-go="team" type="button" style="${clubVars(c)}">
+        ${badge(c)}
+        <span><span class="eyebrow">My Team</span><h3>${esc(c.name)}</h3>
+          <span class="small">${row ? `${ord(row.pos)} in the ${esc(c.league)} · ${row.pts} pts` : esc(c.nickname)}</span></span>
+        <span class="go">Open</span></button>`;
+  }
+
+  function renderPicker() {
+    const leagues = [...new Set(CLUBS.map((c) => c.league))];
+    $('#teampick').innerHTML = `
+      <div class="panel"><span class="eyebrow">My Team</span><h1>Who do you support?</h1>
+        <p class="muted">Pick your favourite club. You can change it any time.</p></div>
+      <div class="picker">${leagues.map((lg) => `<div><span class="eyebrow">${esc(lg)}</span>
+        <div class="grid" style="margin-top:6px">${CLUBS.filter((c) => c.league === lg).map((c) =>
+          `<button class="pick ${S.team === c.id ? 'on' : ''}" data-club="${c.id}" type="button">${badge(c)}<span>${esc(c.name)}</span></button>`).join('')}</div></div>`).join('')}
+      </div>`;
+  }
+
+  function pickClub(id) {
+    S.team = id;
+    save();
+    sfx('coin');
+    renderTeam();
+    show('team');
+    checkTrophies();
+  }
+
+  function renderTeam() {
+    const c = myClub();
+    if (!c) return;
+    const live = clubLive(c);
+    const row = live?.row;
+    const roster = live?.roster || [];
+    const byPos = ['GK', 'DEF', 'MID', 'FWD'].map((k) => [k, roster.filter((p) => p.pos === k).sort((a, b) => (a.number ?? 99) - (b.number ?? 99))]).filter(([, l]) => l.length);
+    const other = roster.filter((p) => !p.pos);
+    if (other.length) byPos.push(['', other]);
+
+    $('#team').innerHTML = `
+      <div class="team-hero" style="${clubVars(c)}">
+        <div class="top">${badge(c, 'big')}<div style="min-width:0"><span class="eyebrow">My Team</span><h1>${esc(c.name)}</h1><p class="small">${esc(c.nickname)}</p></div></div>
+        <div class="facts">
+          <div><span>Stadium</span><b>${esc(c.stadium)}</b></div>
+          <div><span>Fans fit</span><b>${esc(c.capacity)}</b></div>
+          <div><span>City</span><b>${esc(c.city)}</b></div>
+          <div><span>Founded</span><b>${c.founded}</b></div>
+        </div>
+        <div class="row">
+          <button class="btn" data-go="teamquiz" type="button">${esc(c.short)} Quiz</button>
+          <button class="btn ghost" data-go="teampick" type="button">Change team</button>
+        </div>
+      </div>
+
+      <div class="panel" style="display:grid;gap:12px">
+        <span class="eyebrow">This season${LIVE ? ` · updated ${esc(fmtDate(LIVE.updated))}` : ''}</span>
+        ${row ? `
+          <div class="bigpos"><b>${ord(row.pos)}</b><span>in the ${esc(c.league)}</span></div>
+          <div class="statgrid">
+            <div><b>${row.pts}</b><span>Points</span></div><div><b>${row.played}</b><span>Played</span></div>
+            <div><b>${row.won}</b><span>Won</span></div><div><b>${row.drawn}</b><span>Drawn</span></div>
+            <div><b>${row.lost}</b><span>Lost</span></div><div><b>${row.gf}</b><span>Scored</span></div>
+            <div><b>${row.ga}</b><span>Let in</span></div><div><b>${row.gd > 0 ? '+' : ''}${row.gd}</b><span>Goal diff</span></div>
+          </div>
+          ${live.scorers?.length ? `<p><b>In the league's top scorers:</b> ${live.scorers.map((p) => `${esc(p.name)} (${p.value})`).join(', ')}</p>` : ''}`
+        : '<p class="muted">Live stats for this season appear here after the daily update.</p>'}
+      </div>
+
+      <div class="panel" style="display:grid;gap:10px">
+        <span class="eyebrow">How they play</span>
+        <div class="chiprow style">${c.tags.map((t) => `<span>${esc(t)}</span>`).join('')}</div>
+        <p>${esc(c.style)}</p>
+        <div class="coach"><span class="whistle">${whistleSVG}</span><p><b>Coach:</b> ${esc(c.tip)}</p></div>
+      </div>
+
+      <div class="panel squad" style="${clubVars(c)}">
+        <span class="eyebrow">The squad${roster.length ? ` · ${roster.length} players` : ''}</span>
+        ${byPos.length ? byPos.map(([k, list]) => `<div><h3>${esc(POSNAME[k] || 'Others')}</h3><ul>${list.map((p) =>
+          `<li><i>${p.number ?? '–'}</i><span>${esc(p.name)}${p.nation ? `<br><small class="muted">${esc(p.nation)}</small>` : ''}</span></li>`).join('')}</ul></div>`).join('')
+        : '<p class="muted">This season\'s squad appears here after the daily update.</p>'}
+      </div>
+
+      <div class="panel" style="display:grid;gap:10px">
+        <span class="eyebrow">Records & famous facts</span>
+        <ul class="factlist">${c.records.map((r) => `<li>${esc(r)}</li>`).join('')}</ul>
+      </div>
+
+      <div class="panel" style="display:grid;gap:10px">
+        <span class="eyebrow">Club legends</span>
+        <div class="chiprow">${c.legends.map((l) => `<span>${esc(legendName(l))}</span>`).join('')}</div>
+      </div>`;
+  }
+
+  function teamQuestions(c) {
+    const others = CLUBS.filter((o) => o.id !== c.id);
+    const mk = (text, right, wrong, fact, live = false) => {
+      const w = shuffle([...new Set(wrong.map(String))].filter((x) => x !== String(right))).slice(0, 3);
+      return w.length >= 2 ? { d: 2, t: 'team', live, text, right: String(right), wrong: w, fact } : null;
+    };
+    const club = [];
+    club.push(mk(`What is ${c.name}'s stadium called?`, c.stadium, others.map((o) => o.stadium).filter((x) => x !== c.stadium), `About ${c.capacity} fans fit inside.`));
+    club.push(mk(`What is ${c.name}'s nickname?`, c.nickname, others.map((o) => o.nickname), `${c.name} play in ${c.city}.`));
+    club.push(mk(`In which year was ${c.name} founded?`, c.founded, numWrong(c.founded).map((n) => n + (n > c.founded ? 6 : -6)), `That's over ${Math.floor((new Date().getFullYear() - c.founded) / 10) * 10} years ago!`));
+    club.push(mk(`Which city do ${c.name} play in?`, c.city, others.map((o) => o.city).filter((x) => x !== c.city), `Their home is ${c.stadium}.`));
+    const leg = c.legends[rnd(c.legends.length)];
+    const mine = new Set(c.legends.map(legendName));
+    club.push(mk(`Which of these players is a legend at ${c.name}?`, legendName(leg),
+      others.flatMap((o) => o.legends).filter((l) => !legendAlso(l).includes(c.id) && !mine.has(legendName(l))).map(legendName),
+      `${legendName(leg)} is one of the club's all-time greats.`));
+    club.push(mk(`Which style is ${c.name} known for?`, c.tags[0], others.map((o) => o.tags[0]).filter((t) => !c.tags.includes(t)), c.style));
+
+    const live = [];
+    const L = clubLive(c);
+    const when = LIVE ? ` (Stats from ${fmtDate(LIVE.updated)}.)` : '';
+    if (L?.row && L.row.played > 0) {
+      const r = L.row;
+      live.push(mk(`Where are ${c.name} in the ${c.league} table right now?`, ord(r.pos), [1, 2, 3, 4, -1, -2, -3].map((d) => r.pos + d).filter((x) => x >= 1 && x <= 20).map(ord), `They have ${r.pts} points from ${r.played} games.${when}`, true));
+      live.push(mk(`How many goals have ${c.name} scored in the ${c.league} this season?`, r.gf, numWrong(r.gf), `And they've let in ${r.ga}.${when}`, true));
+    }
+    const sq = L?.roster || [];
+    if (sq.length >= 8) {
+      const numbered = shuffle(sq.filter((p) => p.number));
+      numbered.slice(0, 2).forEach((p) => live.push(mk(`Who wears number ${p.number} for ${c.name}?`, p.name,
+        sq.filter((x) => x.name !== p.name && x.number !== p.number).map((x) => x.name), `${p.name} is a ${(POSONE[p.pos] || 'player').toLowerCase()}${p.nation ? ` from ${p.nation}` : ''}.`, true)));
+      const withPos = sq.filter((p) => p.pos);
+      if (withPos.length) {
+        const p = withPos[rnd(withPos.length)];
+        live.push(mk(`What position does ${p.name} play for ${c.name}?`, POSONE[p.pos], Object.values(POSONE), `${p.name} wears number ${p.number ?? '–'}.`, true));
+      }
+      const otherPlayers = Object.entries(LIVE?.clubs || {}).filter(([id]) => id !== c.id).flatMap(([, v]) => (v.roster || []).map((x) => x.name));
+      const names = new Set(sq.map((x) => x.name));
+      const pick = sq[rnd(sq.length)];
+      live.push(mk(`Which of these players is in the ${c.name} squad?`, pick.name, shuffle(otherPlayers.filter((x) => !names.has(x))), `${pick.name} plays for ${c.name} this season.`, true));
+    }
+    if (L?.scorers?.length && (L.scorers.length === 1 || L.scorers[0].value > L.scorers[1].value)) {
+      const top = L.scorers[0];
+      live.push(mk(`Who is ${c.name}'s top scorer in the ${c.league} this season?`, top.name, sq.filter((x) => x.name !== top.name && x.pos !== 'GK').map((x) => x.name), `${top.name} has ${top.value} league goals.${when}`, true));
+    }
+
+    const authored = c.quiz.map((x) => ({ d: 2, t: 'team', ...x }));
+    return { authored, club: club.filter(Boolean), live: live.filter(Boolean) };
+  }
+
+  function startTeamQuiz() {
+    const c = myClub();
+    if (!c) return;
+    const { authored, club, live } = teamQuestions(c);
+    const nLive = Math.min(3, live.length);
+    const picked = [...pickLeastSeen(live, nLive), ...pickLeastSeen(authored, 3)];
+    picked.push(...pickLeastSeen(club, 8 - picked.length));
+    if (picked.length < 8) picked.push(...pickLeastSeen(QUESTIONS.filter((x) => x.d <= 2), 8 - picked.length));
+    startQuiz({ kind: 'team', opp: `${c.short} Legends XI`, title: `${c.name} Quiz`, questions: shuffle(picked.slice(0, 8)) });
   }
 
   // ───────────── Training ground ─────────────
@@ -709,6 +893,7 @@
     if (t.id === 'back') {
       if (screen === 'match' && M) { if (!M.results.length || confirmLeave()) goHome(); return; }
       if (screen === 'result' && M?.kind === 'level') { renderLevel(M.level); show('level'); return; }
+      if ((screen === 'result' && M?.kind === 'team') || (screen === 'teampick' && S.team)) { renderTeam(); show('team'); return; }
       goHome(); return;
     }
     if (t.id === 'sound') { S.sound = !S.sound; save(); renderBar(); if (S.sound) sfx('coin'); return; }
@@ -732,6 +917,7 @@
     if (t.dataset.tf !== undefined) return kick(t.dataset.tf);
     if (t.dataset.drill) return doDrill(t.dataset.drill);
     if (t.dataset.sticker) return showSticker(Number(t.dataset.sticker));
+    if (t.dataset.club) return pickClub(t.dataset.club);
     if (t.dataset.play) { const [i, m] = t.dataset.play.split('-').map(Number); return startLevelMatch(i, m); }
 
     const go = t.dataset.go;
@@ -748,6 +934,9 @@
     }
     if (go === 'shootout') return startShootout();
     if (go === 'live') { renderLive(); return show('live'); }
+    if (go === 'team') { if (!myClub()) { renderPicker(); return show('teampick'); } renderTeam(); return show('team'); }
+    if (go === 'teampick') { renderPicker(); return show('teampick'); }
+    if (go === 'teamquiz') return startTeamQuiz();
     if (go === 'livequiz') return LIVEQ.length >= 8 ? startLiveQuiz() : undefined;
     if (go === 'training') { renderTraining(); return show('training'); }
     if (go === 'album') { renderAlbum(); return show('album'); }
