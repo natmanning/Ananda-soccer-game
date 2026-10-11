@@ -11,7 +11,7 @@ A football quiz career game for Ananda. Climb from **Youth Academy** to the **Ba
 - **Penalty Shootout:** "Real or Fake?" statements. Each right answer is a goal.
 - **Training Ground:** 3 real drills a day to do outside (toe taps, weak-foot passes, Cruyff turns…). Each is worth 15 coins.
 - **Sticker Album:** spend coins on packs and collect 40 legends and stars.
-- **Trophy Cabinet:** 20 achievements, such as hat-tricks, day streaks and a full album.
+- **Trophy Cabinet:** 22 achievements, such as hat-tricks, day streaks and a full album.
 - **Coach's tips:** many answers come with a tip he can use on the pitch.
 
 Progress is saved on the phone (in the browser's local storage).
